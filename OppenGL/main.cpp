@@ -7,9 +7,10 @@
 #include "stb_image.h"
  
 float quadLeft = -0.15f;
-float quadRight = 0.15f;
+float quadRight = 0.15f; 
 float quadTop = 0.15f;
 float quadBottom = -0.15f;
+int chek = 0;
 
 double random_number_y;
 double random_number_x;
