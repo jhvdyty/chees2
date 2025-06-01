@@ -36,5 +36,9 @@
   <ItemGroup>
     <None Include="fragment.glsl" />
     <None Include="vertex.glsl" />
+    <None Include="vertex_plate.glsl" />
+    <None Include="fragment_plate.glsl" />
+    <None Include="vertex_cell.glsl" />
+    <None Include="fragment_cell.glsl" />
   </ItemGroup>
 </Project>
