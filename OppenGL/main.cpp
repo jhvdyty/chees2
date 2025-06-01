@@ -178,14 +178,14 @@ int main() {
 
     std::vector<Cell> cells;
     const int gridSize = 8;
-    const float cellSize = 2.0f / gridSize; // От -1 до 1 по каждой оси
+    const float cellSize = 1.0f / gridSize; // От -1 до 1 по каждой оси
 
     for (int i = 0; i < gridSize; ++i) {
         for (int j = 0; j < gridSize; ++j) {
             Cell cell;
-            cell.centerX = -1.0f + cellSize * i + cellSize / 2.0f;
-            cell.centerY = -1.0f + cellSize * j + cellSize / 2.0f;
-            cell.size = cellSize * 0.7f;
+            cell.centerX = -0.5f + cellSize * i + cellSize / 2.0f;
+            cell.centerY = -0.5f + cellSize * j + cellSize / 2.0f;
+            cell.size = cellSize * 0.8f;
             cells.push_back(cell);
         }
     }
@@ -230,10 +230,10 @@ int main() {
      
     GLfloat vertices_plate[] = { 
         // Positions          // Colors           // Texture Coords
-         1.1f,  1.1f, 0.0f,   1.0f, 0.0f, 0.0f,   1.0f, 1.0f,  // Top Right
-         1.1f, -1.1f, 0.0f,   0.0f, 1.0f, 0.0f,   1.0f, 0.0f,  // Bottom Right
-        -1.1f, -1.1f, 0.0f,   0.0f, 0.0f, 1.0f,   0.0f, 0.0f,  // Bottom Left
-        -1.1f,  1.1f, 0.0f,   1.0f, 1.0f, 0.0f,   0.0f, 1.0f   // Top Left
+         0.6f,  0.6f, 0.0f,   1.0f, 0.0f, 0.0f,   1.0f, 1.0f,  // Top Right
+         0.6f, -0.6f, 0.0f,   0.0f, 1.0f, 0.0f,   1.0f, 0.0f,  // Bottom Right
+        -0.6f, -0.6f, 0.0f,   0.0f, 0.0f, 1.0f,   0.0f, 0.0f,  // Bottom Left
+        -0.6f,  0.6f, 0.0f,   1.0f, 1.0f, 0.0f,   0.0f, 1.0f   // Top Left
     };
 
     GLuint indices_plate[] = {
@@ -324,10 +324,10 @@ int main() {
         for (const auto& cell : cells) {
             // Создаем вершины для каждой ячейки
             GLfloat cellVertices[] = {
-                cell.centerX -0.04 + cell.size / 2, cell.centerY + cell.size / 2, 0.0f, // TR
-                cell.centerX -0.04 + cell.size / 2, cell.centerY - cell.size / 2, 0.0f, // BR
-                cell.centerX - cell.size / 2, cell.centerY - cell.size / 2, 0.0f, // BL
-                cell.centerX - cell.size / 2, cell.centerY + cell.size / 2, 0.0f  // TL
+                cell.centerX -0.07 + cell.size / 2, cell.centerY + cell.size / 2, 0.0f, // TR
+                cell.centerX -0.07 + cell.size / 2, cell.centerY - cell.size / 2, 0.0f, // BR
+                cell.centerX + cell.size / 2, cell.centerY - cell.size / 2, 0.0f, // BL
+                cell.centerX + cell.size / 2, cell.centerY + cell.size / 2, 0.0f  // TL
             };
 
             glBindVertexArray(cellVAO);
