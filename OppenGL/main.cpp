@@ -9,10 +9,10 @@
 #include "stb_image.h"
 #include "chess_piece.h"
  
-const float quadLeft = -0.15f;
-const float quadRight = 0.15f;
-const float quadTop = 0.15f;
-const float quadBottom = -0.15f;
+const float quadLeft = -0.05f;
+const float quadRight = 0.05f;
+const float quadTop = 0.05f;
+const float quadBottom = -0.05f;
 
 bool isdrag = false; 
 bool shouldSnap = false;
@@ -25,6 +25,12 @@ ChessPiece* draggedPiece = nullptr;
 Position draggedPieceOriginalPos(-1, -1);
 float draggedPieceX = 0.0f;
 float draggedPieceY = 0.0f;
+
+PieceColor currentPlayer = PieceColor::WHITE;
+bool boardFlipped = false;
+float flipTransition = 0.0f;
+bool isFlipping = false;
+float flipSpeed = 3.0f;
 
 struct Cell {
     float centerY;
@@ -40,6 +46,11 @@ Position screenToBoardPosition(float screenX, float screenY) {
     int boardX = (int)((screenX - boardStart) / cellSize);
     int boardY = (int)((screenY - boardStart) / cellSize);
 
+    if (boardFlipped) {
+        boardX = 7 - boardX;
+        boardY = 7 - boardY;
+    }
+
     // Ограничиваем значения в пределах доски
     boardX = std::max(0, std::min(7, boardX));
     boardY = std::max(0, std::min(7, boardY));
@@ -49,8 +60,46 @@ Position screenToBoardPosition(float screenX, float screenY) {
 
 void boardToRenderCoords(Position boardPos, float& renderX, float& renderY) {
     const float cellSize = 1.0f / 8.0f;
-    renderX = -0.5f + cellSize * boardPos.x + cellSize / 2.0f;
-    renderY = -0.5f + cellSize * boardPos.y + cellSize / 2.0f;
+
+    Position renderPos = boardPos;
+
+    if (boardFlipped) {
+        renderPos.x = 7 - boardPos.x;
+        renderPos.y = 7 - boardPos.y;
+    }
+
+    renderX = -0.5f + cellSize * renderPos.x + cellSize / 2.0f;
+    renderY = -0.5f + cellSize * renderPos.y + cellSize / 2.0f;
+}
+
+void switchPlayer() {
+    currentPlayer = (currentPlayer == PieceColor::WHITE) ? PieceColor::BLACK : PieceColor::WHITE;
+
+    if (!isFlipping) {
+        isFlipping = true;
+    }
+}
+
+void updateFlipAnimation(float deltaTime) {
+    if (isFlipping) {
+        if (boardFlipped) {
+            flipTransition -= flipSpeed * deltaTime;
+            if (flipTransition <= 0.0f) {
+                flipTransition = 0.0f;
+                boardFlipped = false;
+                isFlipping = false;
+            }
+
+        }
+        else {
+            flipTransition += flipSpeed * deltaTime;
+            if (flipTransition >= 1.0f) {
+                flipTransition = 1.0f;
+                boardFlipped = true;
+                isFlipping = false;
+            }
+        }
+    }
 }
 
 
@@ -106,8 +155,14 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
         float x = (2.0f * xpos) / width - 1.0f;
         float y = 1.0f - (2.0f * ypos) / height;
 
-        draggedPieceX = x - dragOffsetX;
-        draggedPieceY = y - dragOffsetY;
+        if (boardFlipped) {
+            draggedPieceX = x - dragOffsetX;
+            draggedPieceY = y - dragOffsetY;
+        }
+        else {
+            draggedPieceX = x - dragOffsetX;
+            draggedPieceY = y - dragOffsetY;
+        }
     }
 }
 
@@ -141,8 +196,14 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
                 draggedPieceX = pieceRenderX; 
                 draggedPieceY = pieceRenderY;
 
-                dragOffsetX = x - pieceRenderX; 
-                dragOffsetY = y - pieceRenderY; 
+                if (boardFlipped) {
+                    dragOffsetX = x - pieceRenderX;
+                    dragOffsetY = y - pieceRenderY;
+                }
+                else {
+                    dragOffsetX = x - pieceRenderX;
+                    dragOffsetY = y - pieceRenderY;
+                }
             }
         }
         else if (action == GLFW_RELEASE) {
@@ -151,11 +212,16 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 
                 Position targetPos = screenToBoardPosition(draggedPieceX, draggedPieceY);
 
-                
-                if (draggedPiece->canMoveTo(targetPos, globalChessBoard->getBoard())) {
+                if (draggedPiece->getColor() != currentPlayer) {
+                    std::cout << "Не ваша очередь! Текущий игрок: "
+                        << (currentPlayer == PieceColor::WHITE ? "WHITE" : "BLACK") << std::endl;
+                    boardToRenderCoords(draggedPieceOriginalPos, draggedPieceX, draggedPieceY);
+                }
+                else if (draggedPiece->canMoveTo(targetPos, globalChessBoard->getBoard())) {
 
                     if (globalChessBoard->movePiece(draggedPieceOriginalPos, targetPos)) {
-
+                        switchPlayer();
+                        std::cout << "ход выполнен! Текущий игрок: " << (currentPlayer == PieceColor::WHITE ? "WHITE" : "BLACK") << std::endl;
                     }
                     else {
                         std::cout << "Ошибка при выполнении хода!" << std::endl;
@@ -239,7 +305,7 @@ int main() {
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     //glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
 
-    GLFWwindow* window = glfwCreateWindow(800, 600, "Hello Window!", NULL, NULL);
+    GLFWwindow* window = glfwCreateWindow(1920, 1080, "Hello Window!", NULL, NULL); 
     if (window == NULL) {
         std::cerr << "Failed to create GLFW window" << std::endl;
         glfwTerminate();
@@ -283,34 +349,97 @@ int main() {
         }
     }
 
-    chessBoard.placePiece(ChessPiece::createRook(PieceColor::WHITE, Position(0, 0)), Position(0, 0));
-    chessBoard.placePiece(ChessPiece::createKnight(PieceColor::WHITE, Position(1, 0)), Position(1, 0));
-    chessBoard.placePiece(ChessPiece::createBishop(PieceColor::WHITE, Position(2, 0)), Position(2, 0));
-    chessBoard.placePiece(ChessPiece::createQueen(PieceColor::WHITE, Position(3, 0)), Position(3, 0));
-    chessBoard.placePiece(ChessPiece::createKing(PieceColor::WHITE, Position(4, 0)), Position(4, 0));
+    ChessPiece* white_Rook = ChessPiece::createRook(PieceColor::WHITE, Position(0, 0)); 
+    chessBoard.placePiece(white_Rook, Position(0, 0));
 
-    chessBoard.placePiece(ChessPiece::createKnightRook(PieceColor::WHITE, Position(5, 0)), Position(5, 0));
-    chessBoard.placePiece(ChessPiece::createPawnKnight(PieceColor::WHITE, Position(6, 0)), Position(6, 0));
+    white_Rook->loadTexture("texture/white_rook.png"); 
+
+    ChessPiece* white_knight_left = ChessPiece::createKnight(PieceColor::WHITE, Position(1, 0));
+    chessBoard.placePiece(white_knight_left, Position(1, 0)); 
+
+    white_knight_left->loadTexture("texture/white_knight.png"); 
+
+    ChessPiece* white_bishop_left = ChessPiece::createBishop(PieceColor::WHITE, Position(2, 0));
+    chessBoard.placePiece(white_bishop_left, Position(2, 0)); 
+
+    white_bishop_left->loadTexture("texture/white_bishop.png"); 
+
+    ChessPiece* white_queen = ChessPiece::createQueen(PieceColor::WHITE, Position(3, 0)); 
+    chessBoard.placePiece(white_queen, Position(3, 0)); 
+
+    white_queen->loadTexture("texture/white_queen.png");
+
+    ChessPiece* white_king = ChessPiece::createKing(PieceColor::WHITE, Position(4, 0));
+    chessBoard.placePiece(white_king, Position(4, 0));
+    
+    white_king->loadTexture("texture/white_king.png");
+
+    ChessPiece* white_bishop = ChessPiece::createBishop(PieceColor::WHITE, Position(5, 0));
+    chessBoard.placePiece(white_bishop, Position(5, 0));
+
+    white_bishop->loadTexture("texture/white_bishop.png");
+
+    ChessPiece* white_knight = ChessPiece::createKnight(PieceColor::WHITE, Position(6, 0));
+    chessBoard.placePiece(white_knight, Position(6, 0));
+
+    white_knight->loadTexture("texture/white_knight.png");
 
     ChessPiece* superPiece = new ChessPiece(PieceColor::WHITE, Position(7, 0),
         true, true, true, false, true, "Дракон");
     chessBoard.placePiece(superPiece, Position(7, 0));
+    superPiece->loadTexture("texture/white_rook.png");
 
     for (int i = 0; i < 8; i++) {
-        chessBoard.placePiece(ChessPiece::createPawn(PieceColor::WHITE, Position(i, 1)), Position(i, 1));
+        ChessPiece* white_pawn = ChessPiece::createPawn(PieceColor::WHITE, Position(i, 1));
+        chessBoard.placePiece(white_pawn, Position(i, 1)); 
+        white_pawn->loadTexture("texture/white_pawn.png"); 
     }
 
-    chessBoard.placePiece(ChessPiece::createRook(PieceColor::BLACK, Position(0, 7)), Position(0, 7));
-    chessBoard.placePiece(ChessPiece::createKnight(PieceColor::BLACK, Position(1, 7)), Position(1, 7)); 
-    chessBoard.placePiece(ChessPiece::createBishop(PieceColor::BLACK, Position(2, 7)), Position(2, 7)); 
-    chessBoard.placePiece(ChessPiece::createQueen(PieceColor::BLACK, Position(3, 7)), Position(3, 7)); 
-    chessBoard.placePiece(ChessPiece::createKing(PieceColor::BLACK, Position(4, 7)), Position(4, 7)); 
-    chessBoard.placePiece(ChessPiece::createBishop(PieceColor::BLACK, Position(5, 7)), Position(5, 7)); 
-    chessBoard.placePiece(ChessPiece::createKnight(PieceColor::BLACK, Position(6, 7)), Position(6, 7)); 
-    chessBoard.placePiece(ChessPiece::createRook(PieceColor::BLACK, Position(7, 7)), Position(7, 7)); 
+    ChessPiece* rook_left = ChessPiece::createRook(PieceColor::BLACK, Position(0, 7));
+    chessBoard.placePiece(rook_left, Position(0, 7));
+
+    rook_left->loadTexture("texture/rook.png");
+
+    ChessPiece* knight_left = ChessPiece::createKnight(PieceColor::BLACK, Position(1, 7));
+    chessBoard.placePiece(knight_left, Position(1, 7));
+
+    knight_left->loadTexture("texture/knight.png");
+
+    ChessPiece* bishop_left = ChessPiece::createBishop(PieceColor::BLACK, Position(2, 7));
+    chessBoard.placePiece(bishop_left, Position(2, 7)); 
+
+    bishop_left->loadTexture("texture/bishop.png"); 
+
+    ChessPiece* queen = ChessPiece::createQueen(PieceColor::BLACK, Position(3, 7));
+    chessBoard.placePiece(queen, Position(3, 7));
+
+    queen->loadTexture("texture/queen.png");
+
+
+    ChessPiece* King = ChessPiece::createKing(PieceColor::BLACK, Position(4, 7));
+    chessBoard.placePiece(King, Position(4, 7));
+
+    King->loadTexture("texture/king.png");
+
+    ChessPiece* bishop = ChessPiece::createBishop(PieceColor::BLACK, Position(5, 7));
+    chessBoard.placePiece(bishop, Position(5, 7));
+
+    bishop->loadTexture("texture/bishop.png");
+
+    ChessPiece* knight = ChessPiece::createKnight(PieceColor::BLACK, Position(6, 7));
+    chessBoard.placePiece(knight, Position(6, 7));
+
+    knight->loadTexture("texture/knight.png");
+
+    ChessPiece* rook = ChessPiece::createRook(PieceColor::BLACK, Position(7, 7));
+    chessBoard.placePiece(rook, Position(7, 7));
+
+    rook->loadTexture("texture/rook.png");
 
     for (int i = 0; i < 8; i++) {
-        chessBoard.placePiece(ChessPiece::createPawn(PieceColor::BLACK, Position(i, 6)), Position(i, 6)); 
+        ChessPiece* pawn = ChessPiece::createPawn(PieceColor::BLACK, Position(i, 6));
+        chessBoard.placePiece(pawn, Position(i, 6)); 
+        pawn->loadTexture("texture/pawn.png");
     }
      
     GLfloat vertices_plate[] = { 
@@ -364,9 +493,17 @@ int main() {
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
 
- 
+    float lastFrame = 0.0f;
+    float deltaTime = 0.0f;
 
     while (!glfwWindowShouldClose(window)) {
+
+        float currentFrame = glfwGetTime();
+        deltaTime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
+
+        updateFlipAnimation(deltaTime);
+
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
 
@@ -405,19 +542,39 @@ int main() {
         glUniform1i(glGetUniformLocation(ourShader.Program, "ourTexture2"), 1);
         glUniform1f(glGetUniformLocation(ourShader.Program, "mixValue"), mixValue);
 
+        glUniform1f(glGetUniformLocation(ourShader.Program, "flipTransition"), flipTransition);
+        glUniform1i(glGetUniformLocation(ourShader.Program, "boardFlipped"), boardFlipped ? 1 : 0);
+
         auto& board = chessBoard.getBoard();
         for (int y = 0; y < 8; y++) {
             for (int x = 0; x < 8; x++) {
                 ChessPiece* piece = board[y][x];
                 if (piece != nullptr && piece != draggedPiece) {
+                    Position renderPos(x, y);
+                    if (boardFlipped) {
+                        renderPos.x = 7 - x;
+                        renderPos.y = 7 - y;
+                    }
+
+                    float renderX, renderY;
+                    const float cellSize = 1.0f / 8.0f;
+                    renderX = -0.5f + cellSize * renderPos.x + cellSize / 2.0f;
+                    renderY = -0.5f + cellSize * renderPos.y + cellSize / 2.0f;
+
+                    piece->setRenderPosition(renderX, renderY);
                     piece->render(ourShader);
                 }
             }
         }
 
         if (draggedPiece != nullptr && isdrag) {
-            glUniform1f(glGetUniformLocation(ourShader.Program, "x_ran"), draggedPieceX);
-            glUniform1f(glGetUniformLocation(ourShader.Program, "y_ran"), draggedPieceY);
+
+            float finalX = draggedPieceX;
+            float finalY = draggedPieceY;
+
+            glUniform1f(glGetUniformLocation(ourShader.Program, "x_ran"), finalX);
+            glUniform1f(glGetUniformLocation(ourShader.Program, "y_ran"), finalY);
+
             glBindVertexArray(draggedPiece->VAO);
             glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
         }

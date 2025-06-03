@@ -13,6 +13,10 @@ uniform sampler2D ourTexture2;
 
 
 void main() {
-    //color = vec4(ourColor, 1.0f);
-    color = mix(texture(ourTexture1, TexCoord), texture(ourTexture2, TexCoord), mixValue);
+    vec4 texColor = texture(ourTexture1, TexCoord);
+    
+    if(texColor.a < 0.1)
+        discard;
+
+    color = texColor;
 }
