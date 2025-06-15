@@ -1,4 +1,4 @@
-#chees2
+# chees2
 chees2 is an interactive OpenGL-based chessboard simulation built using modern C++ and GLFW. It features drag-and-drop chess piece movement, real-time piece interaction, and a smooth board flipping animation.
 
 # Features
